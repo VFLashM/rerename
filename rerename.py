@@ -4,7 +4,7 @@ import os
 import os.path
 import re
 
-from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar
+from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid
 from tkinter import LEFT, RIGHT, BOTH, X, END
 from tkinter.filedialog import askdirectory
 
@@ -48,9 +48,69 @@ class RootFrame(Frame):
     def value(self):
         return self._value
 
+class RegexFrame(Frame):
+    def __init__(self, master):
+        Frame.__init__(self, master)
+
+        self._regex_var = StringVar(self)
+        self._regex_var.set('.*')
+        self._regex_var.trace('w', self._validate)
+        self._regex_value = re.compile(self._regex_var.get())
+
+        self._repl_var = StringVar(self)
+        self._repl_var.set(r'\0')
+        self._repl_var.trace('w', self._validate)
+        self._repl_value = r'\g<0>'
+
+        Grid.columnconfigure(self, 1, weight=1)
+
+        regex_label = Label(self, text="Regex:")
+        regex_label.grid(column=0, row=0, sticky='w')
+        self._regex_entry = Entry(self, textvariable=self._regex_var)
+        self._regex_entry.grid(column=1, row=0, sticky='we')
+
+        repl_label = Label(self, text="Replacement:")
+        repl_label.grid(column=0, row=1, sticky='w')
+        self._repl_entry = Entry(self, textvariable=self._repl_var)
+        self._repl_entry.grid(column=1, row=1, sticky='we')
+
+    def _validate(self, *_):
+        regex_str = self._regex_var.get()
+        if not regex_str.startswith('^'):
+            regex_str = '^' + regex_str
+        if not regex_str.endswith('$'):
+            regex_str += '$'
+        try:
+            self._regex_value = re.compile(regex_str)
+        except re.error:
+            self._regex_value = None
+            self._regex_entry.config(fg='red')
+        else:
+            self._regex_entry.config(fg='black')
+
+        repl_str = self._repl_var.get().replace(r'\0', r'\g<0>')
+        try:
+            if self._regex_value:
+                self._regex_value.sub(repl_str, '')
+        except re.error:
+            self._repl_value = None
+            self._repl_entry.config(fg='red')
+        else:
+            self._repl_value = repl_str
+            self._repl_entry.config(fg='black')
+
+        self.event_generate('<<RegexUpdate>>', when='tail')
+
+    @property
+    def regex(self):
+        return self._regex_value
+
+    @property
+    def repl(self):
+        return self._repl_value
         
 class ListFrame(Frame):
-    def __init__(self, master, root, regex):
+    def __init__(self, master, root, regex, repl):
         Frame.__init__(self, master)
 
         self._left_list = Listbox(self)
@@ -58,32 +118,60 @@ class ListFrame(Frame):
         self._right_list = Listbox(self)
         self._right_list.pack(side=LEFT, fill=BOTH, expand=True)
 
-        self._re = regex
+        self._regex = regex
+        self._repl = repl
         self._update_root(root)
 
-    def _upadte_regex(self, regex):
-        
-        pass
+        master.bind('<<RootUpdate>>', self._on_root_update)
+        master.bind('<<RegexUpdate>>', self._on_regex_update)
+
+    def _on_root_update(self, event):
+        self._update_root(event.widget.value)
+
+    def _on_regex_update(self, event):
+        self._update_regex(event.widget.regex, event.widget.repl)
+
+    def _update_regex(self, regex, repl):
+        self._regex = regex
+        self._repl = repl
+
+        names = self._left_list.get(0, END)
+        for idx, name in enumerate(names):
+            if self._regex and self._regex.match(name):
+                self._left_list.itemconfig(idx, dict(fg='black'))
+            else:
+                self._left_list.itemconfig(idx, dict(fg='gray'))
+        self._update_right(names)
 
     def _update_root(self, root):
         self._left_list.delete(0, END)
-        for name in sorted(os.listdir(root)):
-            self._left_list.insert(END, name)
-        self._update_right()
-
-    def _update_right(self):
-        self._right_list.delete(0, END)
-        names = self._left_list.get(0, END)
+        names = sorted(os.listdir(root))
         for name in names:
-            #self._re.sub()
-            self._right_list.insert(END, name)
+            idx = self._left_list.size()
+            self._left_list.insert(END, name)
+            if not (self._regex and self._regex.match(name)):
+                self._left_list.itemconfig(idx, dict(fg='gray'))
+        self._update_right(names)
+
+    def _update_right(self, names):
+        self._right_list.delete(0, END)
+        for name in names:
+            if self._regex and self._repl and self._regex.match(name):
+                right_name = self._regex.sub(self._repl, name)
+                self._right_list.insert(END, right_name)
+            else:
+                idx = self._right_list.size()
+                self._right_list.insert(END, name)
+                self._right_list.itemconfig(idx, dict(fg='gray'))
             
 
 root_frame = RootFrame(master)
 root_frame.pack(fill=X)
 
+regex_frame = RegexFrame(master)
+regex_frame.pack(fill=X)
 
-list_frame = ListFrame(master, root_frame.value, None)
+list_frame = ListFrame(master, root_frame.value, regex_frame.regex, regex_frame.repl)
 list_frame.pack(fill=BOTH, expand=True)
 
 master.mainloop()
