@@ -4,7 +4,7 @@ import os
 import os.path
 import re
 
-from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid, Scrollbar
+from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid, Scrollbar, BooleanVar, Checkbutton
 from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL
 from tkinter.filedialog import askdirectory
 
@@ -108,6 +108,59 @@ class RegexFrame(Frame):
     @property
     def repl(self):
         return self._repl_value
+
+class OptionsFrame(Frame):
+    def __init__(self, master):
+        Frame.__init__(self, master)
+
+        self._files_var = BooleanVar()
+        self._files_var.set(True)
+        files_cb = Checkbutton(self, text="Files", variable=self._files_var)
+        files_cb.pack(side=LEFT)
+        self._files_var.trace('w', self._options_update)
+
+        self._dirs_var = BooleanVar()
+        dirs_cb = Checkbutton(self, text="Dirs", variable=self._dirs_var)
+        dirs_cb.pack(side=LEFT)
+        self._dirs_var.trace('w', self._options_update)
+
+        self._others_var = BooleanVar()
+        others_cb = Checkbutton(self, text="Others", variable=self._others_var)
+        others_cb.pack(side=LEFT)
+        self._others_var.trace('w', self._options_update)
+
+        self._hide_wrong_type_var = BooleanVar(self)
+        hide_wrong_type_cb = Checkbutton(self, text="Hide wrong entries", variable=self._hide_wrong_type_var)
+        hide_wrong_type_cb.pack(side=LEFT)
+        self._hide_wrong_type_var.trace('w', self._options_update)
+
+        self._hide_mismatches_var = BooleanVar(self)
+        hide_mismatches_cb = Checkbutton(self, text="Hide mismatches", variable=self._hide_mismatches_var)
+        hide_mismatches_cb.pack(side=LEFT)
+        self._hide_mismatches_var.trace('w', self._options_update)
+
+    def _options_update(self, *_):
+        self.event_generate('<<OptionsUpdate>>', when='tail')
+
+    @property
+    def files(self):
+        return self._files_var.get()
+
+    @property
+    def dirs(self):
+        return self._dirs_var.get()
+
+    def others(self):
+        return self._others_var.get()
+
+    @property
+    def hide_wrong_type(self):
+        return self._hide_wrong_type_var.get()
+
+    @property
+    def hide_mismatches(self):
+        return self._hide_mismatches_var.get()
+    
         
 class ListFrame(Frame):
     def __init__(self, master, root, regex, repl):
@@ -133,6 +186,7 @@ class ListFrame(Frame):
 
         master.bind('<<RootUpdate>>', self._on_root_update)
         master.bind('<<RegexUpdate>>', self._on_regex_update)
+        master.bind('<<OptionsUpdate>>', self._on_options_update)
 
     def _scroll_left(self, sfrom, sto):
         self._scrollbar.set(sfrom, sto)
@@ -152,6 +206,9 @@ class ListFrame(Frame):
     def _on_regex_update(self, event):
         self._update_regex(event.widget.regex, event.widget.repl)
 
+    def _on_options_update(self, event):
+        self._update_root(self._root)
+
     def _update_regex(self, regex, repl):
         self._regex = regex
         self._repl = repl
@@ -165,6 +222,7 @@ class ListFrame(Frame):
         self._update_right(names)
 
     def _update_root(self, root):
+        self._root = root
         self._left_list.delete(0, END)
         names = sorted(os.listdir(root))
         for name in names:
@@ -191,6 +249,9 @@ root_frame.pack(fill=X)
 
 regex_frame = RegexFrame(master)
 regex_frame.pack(fill=X)
+
+options_frame = OptionsFrame(master)
+options_frame.pack(fill=X)
 
 list_frame = ListFrame(master, root_frame.value, regex_frame.regex, regex_frame.repl)
 list_frame.pack(fill=BOTH, expand=True)
