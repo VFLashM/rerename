@@ -9,10 +9,6 @@ from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid, S
 from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL
 from tkinter.filedialog import askdirectory
 
-
-master = Tk()
-master.title('Regex mass rename')
-
 class RootFrame(Frame):
     def __init__(self, master):
         Frame.__init__(self, master)
@@ -55,6 +51,7 @@ class RootFrame(Frame):
     @property
     def value(self):
         return self._value
+
 
 class RegexFrame(Frame):
     def __init__(self, master):
@@ -117,7 +114,9 @@ class RegexFrame(Frame):
     def repl(self):
         return self._repl_value
 
+
 Options = namedtuple('Options', 'files dirs others hide_wrong_type hide_mismatches')
+
 
 class OptionsFrame(Frame):
     def __init__(self, master):
@@ -162,6 +161,7 @@ class OptionsFrame(Frame):
             hide_mismatches=self._hide_mismatches_var.get(),
         )
         
+
 class ListFrame(Frame):
     def __init__(self, master, root, regex, repl, options):
         Frame.__init__(self, master)
@@ -265,19 +265,28 @@ class ListFrame(Frame):
                     self._left_list.insert(END, name)
                     self._right_list.insert(END, right_name)
 
-root_frame = RootFrame(master)
-root_frame.pack(fill=X)
 
-regex_frame = RegexFrame(master)
-regex_frame.pack(fill=X)
+def main():
+    master = Tk()
+    master.title('Regex mass rename')                    
 
-options_frame = OptionsFrame(master)
-options_frame.pack(fill=X)
+    root_frame = RootFrame(master)
+    root_frame.pack(fill=X)
 
-list_frame = ListFrame(master,
-                       root_frame.value,
-                       regex_frame.regex, regex_frame.repl,
-                       options_frame.options)
-list_frame.pack(fill=BOTH, expand=True)
+    regex_frame = RegexFrame(master)
+    regex_frame.pack(fill=X)
 
-master.mainloop()
+    options_frame = OptionsFrame(master)
+    options_frame.pack(fill=X)
+
+    list_frame = ListFrame(master,
+                           root_frame.value,
+                           regex_frame.regex, regex_frame.repl,
+                           options_frame.options)
+    list_frame.pack(fill=BOTH, expand=True)
+
+    master.mainloop()
+
+
+if __name__ == '__main__':
+    main()
