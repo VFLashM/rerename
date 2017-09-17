@@ -14,6 +14,21 @@ from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL, RIDGE
 from tkinter.filedialog import askdirectory
 from tkinter.messagebox import showerror
 
+def repad(widget, attr, margin, spacing, attr2=None, margin2=None):
+    if attr2:
+        kw2 = {attr2: margin2}
+    else:
+        kw2 = {}
+    children = widget.winfo_children()
+    for idx, child in enumerate(children):
+        if len(children) == 1:
+            child.pack_configure(**kw2, **{attr: margin})
+        elif idx == 0:
+            child.pack_configure(**kw2, **{attr: (margin, 0)})
+        elif (idx+1) == len(children):
+            child.pack_configure(**kw2, **{attr: (spacing, margin)})
+        else:
+            child.pack_configure(**kw2, **{attr: (spacing, 0)})
 
 def Separator(master):
     return Frame(master, relief=RIDGE, width=2, height=2, bd=1)
@@ -33,10 +48,12 @@ class RootFrame(Frame):
         self._entry.pack(side=LEFT, fill=X, expand=True)
         
         open_button = Button(self, text="Open", command=self._select_root)
-        open_button.pack(side=LEFT, padx=3)
+        open_button.pack(side=LEFT)
         
         refresh_button = Button(self, text="Refresh", command=self._refresh)
         refresh_button.pack(side=LEFT)
+
+        repad(self, 'padx', 0, 5)
 
     def _refresh(self):
         self.event_generate('<<Refresh>>', when='tail')
@@ -79,12 +96,12 @@ class RegexFrame(Frame):
         Grid.columnconfigure(self, 1, weight=1)
 
         regex_label = Label(self, text="Regex:")
-        regex_label.grid(column=0, row=0, sticky='w')
+        regex_label.grid(column=0, row=0, sticky='w', padx=(0, 5))
         self._regex_entry = Entry(self, textvariable=self._regex_var)
         self._regex_entry.grid(column=1, row=0, sticky='we')
 
         repl_label = Label(self, text="Replacement:")
-        repl_label.grid(column=0, row=1, sticky='w')
+        repl_label.grid(column=0, row=1, sticky='w', padx=(0, 5))
         self._repl_entry = Entry(self, textvariable=self._repl_var)
         self._repl_entry.grid(column=1, row=1, sticky='we')
 
@@ -165,6 +182,8 @@ class OptionsFrame(Frame):
         overwrite_cb = Checkbutton(self, text="Overwrite", variable=self._overwrite_var)
         overwrite_cb.pack(side=LEFT)
         self._overwrite_var.trace('w', self._options_update)
+
+        repad(self, 'padx', 0, 5)
 
     def _options_update(self, *_):
         self.event_generate('<<OptionsUpdate>>', when='tail')
@@ -376,19 +395,19 @@ def main():
     master.title('Regex mass rename')                    
 
     root_frame = RootFrame(master)
-    root_frame.pack(fill=X, pady=5, padx=3)
+    root_frame.pack(fill=X)
 
     regex_frame = RegexFrame(master)
-    regex_frame.pack(fill=X, padx=3)
+    regex_frame.pack(fill=X)
 
     options_frame = OptionsFrame(master)
-    options_frame.pack(fill=X, pady=5, padx=3)
+    options_frame.pack(fill=X)
 
     list_frame = ListFrame(master,
                            root_frame.value,
                            regex_frame.regex, regex_frame.repl,
                            options_frame.options)
-    list_frame.pack(fill=BOTH, expand=True, padx=3)
+    list_frame.pack(fill=BOTH, expand=True)
 
     def perform_rename(*args):
         errors = list_frame.errors
@@ -403,7 +422,9 @@ def main():
             master.event_generate('<<Refresh>>', when='tail')
 
     rename_button = Button(master, text='Rename', command=perform_rename)
-    rename_button.pack(pady=5)
+    rename_button.pack()
+
+    repad(master, 'pady', 5, 5, 'padx', 5)
 
     master.mainloop()
 
