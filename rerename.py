@@ -10,9 +10,13 @@ import hashlib
 import sys
 
 from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid, Scrollbar, BooleanVar, Checkbutton
-from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL
+from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL, RIDGE
 from tkinter.filedialog import askdirectory
 from tkinter.messagebox import showerror
+
+
+def Separator(master):
+    return Frame(master, relief=RIDGE, width=2, height=2, bd=1)
 
 class RootFrame(Frame):
     def __init__(self, master):
@@ -29,7 +33,7 @@ class RootFrame(Frame):
         self._entry.pack(side=LEFT, fill=X, expand=True)
         
         open_button = Button(self, text="Open", command=self._select_root)
-        open_button.pack(side=LEFT)
+        open_button.pack(side=LEFT, padx=3)
         
         refresh_button = Button(self, text="Refresh", command=self._refresh)
         refresh_button.pack(side=LEFT)
@@ -143,6 +147,8 @@ class OptionsFrame(Frame):
         others_cb.pack(side=LEFT)
         self._others_var.trace('w', self._options_update)
 
+        Separator(self).pack(side=LEFT, fill=Y)
+        
         self._hide_wrong_type_var = BooleanVar(self)
         hide_wrong_type_cb = Checkbutton(self, text="Hide wrong entries", variable=self._hide_wrong_type_var)
         hide_wrong_type_cb.pack(side=LEFT)
@@ -152,6 +158,8 @@ class OptionsFrame(Frame):
         hide_mismatches_cb = Checkbutton(self, text="Hide mismatches", variable=self._hide_mismatches_var)
         hide_mismatches_cb.pack(side=LEFT)
         self._hide_mismatches_var.trace('w', self._options_update)
+
+        Separator(self).pack(side=LEFT, fill=Y)
 
         self._overwrite_var = BooleanVar()
         overwrite_cb = Checkbutton(self, text="Overwrite", variable=self._overwrite_var)
@@ -368,19 +376,19 @@ def main():
     master.title('Regex mass rename')                    
 
     root_frame = RootFrame(master)
-    root_frame.pack(fill=X)
+    root_frame.pack(fill=X, pady=5, padx=3)
 
     regex_frame = RegexFrame(master)
-    regex_frame.pack(fill=X)
+    regex_frame.pack(fill=X, padx=3)
 
     options_frame = OptionsFrame(master)
-    options_frame.pack(fill=X)
+    options_frame.pack(fill=X, pady=5, padx=3)
 
     list_frame = ListFrame(master,
                            root_frame.value,
                            regex_frame.regex, regex_frame.repl,
                            options_frame.options)
-    list_frame.pack(fill=BOTH, expand=True)
+    list_frame.pack(fill=BOTH, expand=True, padx=3)
 
     def perform_rename(*args):
         errors = list_frame.errors
@@ -395,7 +403,7 @@ def main():
             master.event_generate('<<Refresh>>', when='tail')
 
     rename_button = Button(master, text='Rename', command=perform_rename)
-    rename_button.pack()
+    rename_button.pack(pady=5)
 
     master.mainloop()
 
