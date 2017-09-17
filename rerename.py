@@ -269,7 +269,7 @@ class ListFrame(Frame):
     def _update_lists(self):
         self._mapping = []
         self._errors = []
-        self._rev_mapping = {}
+        rev_mapping = {}
         self._left_list.delete(0, END)
         self._right_list.delete(0, END)
 
@@ -298,14 +298,14 @@ class ListFrame(Frame):
                         right_path = os.path.join(self._root, right_name)
                         if os.path.exists(right_path):
                             error = 'File already exists: %s' % right_name
-                        elif right_name in self._rev_mapping:
-                            other_name, other_idx = self._rev_mapping[right_name]
+                        elif right_name in rev_mapping:
+                            other_name, other_idx = rev_mapping[right_name]
                             colliding_sources = name, other_name
                             error = 'Name collision: %s <- %s | %s' % (right_name, *colliding_sources)
                             self._right_list.itemconfig(other_idx, dict(fg='red'))
                         else:
                             error = None
-                            self._rev_mapping[right_name] = name, idx
+                            rev_mapping[right_name] = name, idx
 
                         if error:
                             self._errors.append(error)
