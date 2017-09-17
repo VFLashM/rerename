@@ -8,6 +8,7 @@ from collections import namedtuple
 from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid, Scrollbar, BooleanVar, Checkbutton
 from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL
 from tkinter.filedialog import askdirectory
+from tkinter.messagebox import showerror
 
 class RootFrame(Frame):
     def __init__(self, master):
@@ -185,6 +186,7 @@ class ListFrame(Frame):
         self._settings = options
         self._root = None
         self._names = None
+        self._mapping = None
         self._update_root(root)
 
         master.bind('<<RootUpdate>>', self._on_root_update)
@@ -249,6 +251,7 @@ class ListFrame(Frame):
         self._right_list.itemconfig(idx, dict(fg=color))
 
     def _update_lists(self):
+        self._mapping = {}
         self._left_list.delete(0, END)
         self._right_list.delete(0, END)
         
@@ -264,7 +267,28 @@ class ListFrame(Frame):
                     right_name = self._regex.sub(self._repl, name)
                     self._left_list.insert(END, name)
                     self._right_list.insert(END, right_name)
+                    self._mapping[name] = right_name
 
+    @property
+    def mapping(self):
+        return self._mapping
+
+def rename(root, mapping):
+    renamed = {}
+    for name_from, name_to in mapping.items():
+        path_from = os.path.join(root, name_from)
+        path_to = os.path.join(root, name_to)
+        try:
+            os.rename(path_from, path_to)
+        except Exception as e:
+            for done_from, done_to in renamed.items():
+                print('rb', done_from, done_to)
+                os.rename(done_to, done_from)
+            showerror("Unable to rename", str(e))
+            break
+        else:
+            print('done', path_from, path_to)
+            renamed[path_from] = path_to
 
 def main():
     master = Tk()
@@ -284,6 +308,9 @@ def main():
                            regex_frame.regex, regex_frame.repl,
                            options_frame.options)
     list_frame.pack(fill=BOTH, expand=True)
+
+    rename_button = Button(master, text='Rename', command=lambda *_: rename(root_frame.value, list_frame.mapping))
+    rename_button.pack()
 
     master.mainloop()
 
