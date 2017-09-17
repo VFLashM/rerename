@@ -197,6 +197,7 @@ class ListFrame(Frame):
         self._root = None
         self._names = None
         self._mapping = None
+        self._errors = None
         self._update_root(root)
 
         master.bind('<<RootUpdate>>', self._on_root_update)
@@ -257,17 +258,23 @@ class ListFrame(Frame):
 
         self._update_lists()
 
-    def _insert_name_both(self, name, color):
+    def _insert_name_both(self, name, color, color_right_only=False):
         idx = self._left_list.size()
         self._left_list.insert(END, name)
-        self._left_list.itemconfig(idx, dict(fg=color))
+        if not color_right_only:
+            self._left_list.itemconfig(idx, dict(fg=color))
         self._right_list.insert(END, name)
         self._right_list.itemconfig(idx, dict(fg=color))
 
     def _update_lists(self):
         self._mapping = []
+        self._errors = []
+        self._rev_mapping = {}
         self._left_list.delete(0, END)
         self._right_list.delete(0, END)
+
+        if not self._repl:
+            self._errors.append('Invalid replacement string')
         
         for name, ftype in self._names:
             enabled = self._is_type_enabled(ftype)
@@ -276,16 +283,42 @@ class ListFrame(Frame):
                     self._insert_name_both(name, 'gray')
                 elif self._regex and not self._regex.match(name):
                     if not self._settings.hide_mismatches:
-                        self._insert_name_both(name, 'red')
+                        self._insert_name_both(name, 'gray')
+                elif not self._repl:
+                    self._insert_name_both(name, 'gray', color_right_only=True)
                 else:
+                    idx = self._left_list.size()
                     right_name = self._regex.sub(self._repl, name)
                     self._left_list.insert(END, name)
                     self._right_list.insert(END, right_name)
-                    self._mapping.append((name, right_name))
+
+                    if name != right_name:
+                        self._mapping.append((name, right_name))
+
+                        right_path = os.path.join(self._root, right_name)
+                        if os.path.exists(right_path):
+                            error = 'File already exists: %s' % right_name
+                        elif right_name in self._rev_mapping:
+                            other_name, other_idx = self._rev_mapping[right_name]
+                            colliding_sources = name, other_name
+                            error = 'Name collision: %s <- %s | %s' % (right_name, *colliding_sources)
+                            self._right_list.itemconfig(other_idx, dict(fg='red'))
+                        else:
+                            error = None
+                            self._rev_mapping[right_name] = name, idx
+
+                        if error:
+                            self._errors.append(error)
+                            self._right_list.itemconfig(idx, dict(fg='red'))
 
     @property
     def mapping(self):
-        return self._mapping
+        if not self._errors:
+            return self._mapping
+
+    @property
+    def errors(self):
+        return self._errors
 
 def md5(val):
     m = hashlib.md5()
@@ -296,6 +329,8 @@ def rename(root, mapping, overwrite):
     renamed = []
     temp = []
     for name_from, name_to in mapping:
+        if name_from == name_to:
+            continue
         path_from = os.path.join(root, name_from)
         path_to = os.path.join(root, name_to)
         try:
@@ -348,8 +383,16 @@ def main():
     list_frame.pack(fill=BOTH, expand=True)
 
     def perform_rename(*args):
-        rename(root_frame.value, list_frame.mapping, options_frame.options.overwrite)
-        master.event_generate('<<Refresh>>', when='tail')
+        errors = list_frame.errors
+        if len(errors) > 20:
+            errors = errors[:20] + ['...']
+        if errors:
+            showerror('Error', '\n'.join(errors))
+        elif not list_frame.mapping:
+            showerror('Error', 'Nothing to rename')
+        else:
+            rename(root_frame.value, list_frame.mapping, options_frame.options.overwrite)
+            master.event_generate('<<Refresh>>', when='tail')
 
     rename_button = Button(master, text='Rename', command=perform_rename)
     rename_button.pack()
