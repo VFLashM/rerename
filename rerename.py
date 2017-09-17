@@ -4,8 +4,8 @@ import os
 import os.path
 import re
 
-from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid
-from tkinter import LEFT, RIGHT, BOTH, X, END
+from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid, Scrollbar
+from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL
 from tkinter.filedialog import askdirectory
 
 
@@ -115,8 +115,17 @@ class ListFrame(Frame):
 
         self._left_list = Listbox(self)
         self._left_list.pack(side=LEFT, fill=BOTH, expand=True)
+        
         self._right_list = Listbox(self)
         self._right_list.pack(side=LEFT, fill=BOTH, expand=True)
+        self._right_scroll = Scrollbar(self._right_list, orient=VERTICAL)
+        self._right_list.config(yscrollcommand=self._right_scroll.set)
+        self._right_scroll.config(command=self._right_list.yview)
+
+        self._scrollbar = Scrollbar(self, orient=VERTICAL, command=self._scroll_scrollbar)
+        self._scrollbar.pack(side=RIGHT, fill=Y)
+        self._left_list.config(yscrollcommand=self._scroll_left)
+        self._right_list.config(yscrollcommand=self._scroll_right)
 
         self._regex = regex
         self._repl = repl
@@ -124,6 +133,18 @@ class ListFrame(Frame):
 
         master.bind('<<RootUpdate>>', self._on_root_update)
         master.bind('<<RegexUpdate>>', self._on_regex_update)
+
+    def _scroll_left(self, sfrom, sto):
+        self._scrollbar.set(sfrom, sto)
+        self._right_list.yview('moveto', sfrom)
+
+    def _scroll_right(self, sfrom, sto):
+        self._scrollbar.set(sfrom, sto)
+        self._left_list.yview('moveto', sfrom)
+
+    def _scroll_scrollbar(self, *args):
+        self._left_list.yview(*args)
+        self._right_list.yview(*args)
 
     def _on_root_update(self, event):
         self._update_root(event.widget.value)
