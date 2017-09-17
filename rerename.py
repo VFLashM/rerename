@@ -274,14 +274,15 @@ class ListFrame(Frame):
         self._root = root
         self._left_list.delete(0, END)
         self._names = []
-        for name in sorted(os.listdir(root)):
-            path = os.path.join(self._root, name)
-            ftype = None
-            if os.path.isfile(path):
-                ftype = True
-            if os.path.isdir(path):
-                ftype = False
-            self._names.append((name, ftype))
+        if self._root:
+            for name in sorted(os.listdir(root)):
+                path = os.path.join(self._root, name)
+                ftype = None
+                if os.path.isfile(path):
+                    ftype = True
+                if os.path.isdir(path):
+                    ftype = False
+                self._names.append((name, ftype))
 
         self._update_lists()
 
