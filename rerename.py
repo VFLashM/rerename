@@ -4,6 +4,10 @@ import os
 import os.path
 import re
 from collections import namedtuple
+import traceback
+import time
+import hashlib
+import sys
 
 from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid, Scrollbar, BooleanVar, Checkbutton
 from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL
@@ -31,7 +35,7 @@ class RootFrame(Frame):
         refresh_button.pack(side=LEFT)
 
     def _refresh(self):
-        self.event_generate('<<RootUpdate>>', when='tail')
+        self.event_generate('<<Refresh>>', when='tail')
 
     def _validate(self, *_):
         res = self._var.get().strip()
@@ -41,7 +45,7 @@ class RootFrame(Frame):
         else:
             self._entry.config(fg='red')
             self._value = None
-        self._refresh()
+        self.event_generate('<<RootUpdate>>', when='tail')
 
     def _select_root(self):
         value = askdirectory()
@@ -116,7 +120,7 @@ class RegexFrame(Frame):
         return self._repl_value
 
 
-Options = namedtuple('Options', 'files dirs others hide_wrong_type hide_mismatches')
+Options = namedtuple('Options', 'files dirs others hide_wrong_type hide_mismatches overwrite')
 
 
 class OptionsFrame(Frame):
@@ -149,6 +153,11 @@ class OptionsFrame(Frame):
         hide_mismatches_cb.pack(side=LEFT)
         self._hide_mismatches_var.trace('w', self._options_update)
 
+        self._overwrite_var = BooleanVar()
+        overwrite_cb = Checkbutton(self, text="Overwrite", variable=self._overwrite_var)
+        overwrite_cb.pack(side=LEFT)
+        self._overwrite_var.trace('w', self._options_update)
+
     def _options_update(self, *_):
         self.event_generate('<<OptionsUpdate>>', when='tail')
 
@@ -160,6 +169,7 @@ class OptionsFrame(Frame):
             others=self._others_var.get(),
             hide_wrong_type=self._hide_wrong_type_var.get(),
             hide_mismatches=self._hide_mismatches_var.get(),
+            overwrite=self._overwrite_var.get(),
         )
         
 
@@ -192,6 +202,7 @@ class ListFrame(Frame):
         master.bind('<<RootUpdate>>', self._on_root_update)
         master.bind('<<RegexUpdate>>', self._on_regex_update)
         master.bind('<<OptionsUpdate>>', self._on_options_update)
+        master.bind('<<Refresh>>', self._on_refresh)
 
     def _scroll_left(self, sfrom, sto):
         self._scrollbar.set(sfrom, sto)
@@ -210,6 +221,9 @@ class ListFrame(Frame):
 
     def _on_regex_update(self, event):
         self._update_regex(event.widget.regex, event.widget.repl)
+
+    def _on_refresh(self, event):
+        self._update_root(self._root)
 
     def _on_options_update(self, event):
         self._settings = event.widget.options
@@ -251,7 +265,7 @@ class ListFrame(Frame):
         self._right_list.itemconfig(idx, dict(fg=color))
 
     def _update_lists(self):
-        self._mapping = {}
+        self._mapping = []
         self._left_list.delete(0, END)
         self._right_list.delete(0, END)
         
@@ -267,30 +281,54 @@ class ListFrame(Frame):
                     right_name = self._regex.sub(self._repl, name)
                     self._left_list.insert(END, name)
                     self._right_list.insert(END, right_name)
-                    self._mapping[name] = right_name
+                    self._mapping.append((name, right_name))
 
     @property
     def mapping(self):
         return self._mapping
 
-def rename(root, mapping):
-    renamed = {}
-    for name_from, name_to in mapping.items():
+def md5(val):
+    m = hashlib.md5()
+    m.update(val.encode('utf8'))
+    return m.hexdigest()
+
+def rename(root, mapping, overwrite):
+    renamed = []
+    temp = []
+    for name_from, name_to in mapping:
         path_from = os.path.join(root, name_from)
         path_to = os.path.join(root, name_to)
         try:
-            os.rename(path_from, path_to)
+            try:
+                if os.path.exists(path_to):
+                    raise FileExistsError(path_to)
+                os.rename(path_from, path_to)
+            except FileExistsError:
+                if not overwrite:
+                    raise
+                path_tmp = '%s.%s.%s.%s' % (path_to, os.getpid(), int(time.time()), md5(path_from))
+                os.rename(path_to, path_tmp)
+                renamed.append((path_to, path_tmp))
+                temp.append(path_tmp)
+                os.rename(path_from, path_to)
         except Exception as e:
-            for done_from, done_to in renamed.items():
-                print('rb', done_from, done_to)
+            for done_from, done_to in reversed(renamed):
                 os.rename(done_to, done_from)
-            showerror("Unable to rename", str(e))
-            break
+            raise
         else:
-            print('done', path_from, path_to)
-            renamed[path_from] = path_to
+            renamed.append((path_from, path_to))
+    for path in temp:
+        os.remove(path)
+
+def show_error(self, et, ev, tb):
+    for line in traceback.format_exception(et, ev, tb):
+        sys.stderr.write(line)
+    
+    err = traceback.format_exception_only(et, ev)
+    showerror('Exception', ''.join(err))
 
 def main():
+    Tk.report_callback_exception = show_error
     master = Tk()
     master.title('Regex mass rename')                    
 
@@ -309,7 +347,11 @@ def main():
                            options_frame.options)
     list_frame.pack(fill=BOTH, expand=True)
 
-    rename_button = Button(master, text='Rename', command=lambda *_: rename(root_frame.value, list_frame.mapping))
+    def perform_rename(*args):
+        rename(root_frame.value, list_frame.mapping, options_frame.options.overwrite)
+        master.event_generate('<<Refresh>>', when='tail')
+
+    rename_button = Button(master, text='Rename', command=perform_rename)
     rename_button.pack()
 
     master.mainloop()
