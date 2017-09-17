@@ -3,6 +3,7 @@
 import os
 import os.path
 import re
+from collections import namedtuple
 
 from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid, Scrollbar, BooleanVar, Checkbutton
 from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL
@@ -116,6 +117,8 @@ class RegexFrame(Frame):
     def repl(self):
         return self._repl_value
 
+Options = namedtuple('Options', 'files dirs others hide_wrong_type hide_mismatches')
+
 class OptionsFrame(Frame):
     def __init__(self, master):
         Frame.__init__(self, master)
@@ -150,27 +153,17 @@ class OptionsFrame(Frame):
         self.event_generate('<<OptionsUpdate>>', when='tail')
 
     @property
-    def files(self):
-        return self._files_var.get()
-
-    @property
-    def dirs(self):
-        return self._dirs_var.get()
-
-    def others(self):
-        return self._others_var.get()
-
-    @property
-    def hide_wrong_type(self):
-        return self._hide_wrong_type_var.get()
-
-    @property
-    def hide_mismatches(self):
-        return self._hide_mismatches_var.get()
-    
+    def options(self):
+        return Options(
+            files=self._files_var.get(),
+            dirs=self._dirs_var.get(),
+            others=self._others_var.get(),
+            hide_wrong_type=self._hide_wrong_type_var.get(),
+            hide_mismatches=self._hide_mismatches_var.get(),
+        )
         
 class ListFrame(Frame):
-    def __init__(self, master, root, regex, repl):
+    def __init__(self, master, root, regex, repl, options):
         Frame.__init__(self, master)
 
         self._left_list = Listbox(self)
@@ -189,6 +182,9 @@ class ListFrame(Frame):
 
         self._regex = regex
         self._repl = repl
+        self._settings = options
+        self._root = None
+        self._names = None
         self._update_root(root)
 
         master.bind('<<RootUpdate>>', self._on_root_update)
@@ -214,42 +210,60 @@ class ListFrame(Frame):
         self._update_regex(event.widget.regex, event.widget.repl)
 
     def _on_options_update(self, event):
-        self._update_root(self._root)
+        self._settings = event.widget.options
+        self._update_lists()
 
     def _update_regex(self, regex, repl):
         self._regex = regex
         self._repl = repl
+        self._update_lists()
 
-        names = self._left_list.get(0, END)
-        for idx, name in enumerate(names):
-            if self._regex and self._regex.match(name):
-                self._left_list.itemconfig(idx, dict(fg='black'))
-            else:
-                self._left_list.itemconfig(idx, dict(fg='gray'))
-        self._update_right(names)
+    def _is_type_enabled(self, ftype):
+        if ftype is True:
+            return self._settings.files
+        elif ftype is False:
+            return self._settings.dirs
+        else:
+            return self._settings.others
 
     def _update_root(self, root):
         self._root = root
         self._left_list.delete(0, END)
-        names = sorted(os.listdir(root))
-        for name in names:
-            idx = self._left_list.size()
-            self._left_list.insert(END, name)
-            if not (self._regex and self._regex.match(name)):
-                self._left_list.itemconfig(idx, dict(fg='gray'))
-        self._update_right(names)
+        self._names = []
+        for name in sorted(os.listdir(root)):
+            path = os.path.join(self._root, name)
+            ftype = None
+            if os.path.isfile(path):
+                ftype = True
+            if os.path.isdir(path):
+                ftype = False
+            self._names.append((name, ftype))
 
-    def _update_right(self, names):
+        self._update_lists()
+
+    def _insert_name_both(self, name, color):
+        idx = self._left_list.size()
+        self._left_list.insert(END, name)
+        self._left_list.itemconfig(idx, dict(fg=color))
+        self._right_list.insert(END, name)
+        self._right_list.itemconfig(idx, dict(fg=color))
+
+    def _update_lists(self):
+        self._left_list.delete(0, END)
         self._right_list.delete(0, END)
-        for name in names:
-            if self._regex and self._repl and self._regex.match(name):
-                right_name = self._regex.sub(self._repl, name)
-                self._right_list.insert(END, right_name)
-            else:
-                idx = self._right_list.size()
-                self._right_list.insert(END, name)
-                self._right_list.itemconfig(idx, dict(fg='gray'))
-            
+        
+        for name, ftype in self._names:
+            enabled = self._is_type_enabled(ftype)
+            if enabled or not self._settings.hide_wrong_type:
+                if not enabled or not self._regex:
+                    self._insert_name_both(name, 'gray')
+                elif self._regex and not self._regex.match(name):
+                    if not self._settings.hide_mismatches:
+                        self._insert_name_both(name, 'red')
+                else:
+                    right_name = self._regex.sub(self._repl, name)
+                    self._left_list.insert(END, name)
+                    self._right_list.insert(END, right_name)
 
 root_frame = RootFrame(master)
 root_frame.pack(fill=X)
@@ -260,7 +274,10 @@ regex_frame.pack(fill=X)
 options_frame = OptionsFrame(master)
 options_frame.pack(fill=X)
 
-list_frame = ListFrame(master, root_frame.value, regex_frame.regex, regex_frame.repl)
+list_frame = ListFrame(master,
+                       root_frame.value,
+                       regex_frame.regex, regex_frame.repl,
+                       options_frame.options)
 list_frame.pack(fill=BOTH, expand=True)
 
 master.mainloop()
