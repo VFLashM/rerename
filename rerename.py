@@ -25,8 +25,15 @@ class RootFrame(Frame):
         label.pack(side=LEFT)
         self._entry = Entry(self, textvariable=self._var)
         self._entry.pack(side=LEFT, fill=X, expand=True)
-        button = Button(self, text="Open", command=self.select_root)
-        button.pack(side=LEFT)
+        
+        open_button = Button(self, text="Open", command=self._select_root)
+        open_button.pack(side=LEFT)
+        
+        refresh_button = Button(self, text="Refresh", command=self._refresh)
+        refresh_button.pack(side=LEFT)
+
+    def _refresh(self):
+        self.event_generate('<<RootUpdate>>', when='tail')
 
     def _validate(self, *_):
         res = self._var.get().strip()
@@ -36,9 +43,9 @@ class RootFrame(Frame):
         else:
             self._entry.config(fg='red')
             self._value = None
-        self.event_generate('<<RootUpdate>>', when='tail')
+        self._refresh()
 
-    def select_root(self):
+    def _select_root(self):
         value = askdirectory()
         if value:
             self._var.set(value)
