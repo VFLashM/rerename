@@ -58,12 +58,6 @@ class RenameTest(unittest.TestCase):
                     parsed_desc[key] = os.path.basename(key)
         self.assertEqual(parsed_desc, dict(walk(self.root)))
 
-    def full_test(self, desc, **kwargs):
-        before, rename, after = desc.split('@')
-        self.create(before)
-        rerename.rename(self.root, parse(rename), **kwargs)
-        self.check(after)
-
     def full_test_fail(self, desc, etype, **kwargs):
         before, rename = desc.split('@')
         self.create(before)
@@ -71,6 +65,23 @@ class RenameTest(unittest.TestCase):
             rerename.rename(self.root, parse(rename), **kwargs)
         self.check(before)
 
+    def full_test(self, desc, **kwargs):
+        before, rename, after = desc.split('@')
+        self.create(before)
+        rerename.rename(self.root, parse(rename), **kwargs)
+        self.check(after)
+
+        # ensure that same mapping with error at the end
+        # cleans up properly
+        self.root = os.path.join(self.root, 'cleanup_test')
+        os.mkdir(self.root)
+        self.create(before)
+        mapping = list(parse(rename))
+        mapping.append(('missing', 'irrelevant'))
+        with self.assertRaises(OSError):
+            rerename.rename(self.root, mapping, **kwargs)
+
+    
     def setUp(self):
         self.root_obj = tempfile.TemporaryDirectory()
         self.root = self.root_obj.name
@@ -210,11 +221,11 @@ class RenameTest(unittest.TestCase):
             f/f2
         ''', overwrite=True)
 
-    def test_dirs_overwrite_fail(self):
-        self.full_test_fail('''
-            a/a1
-            b/b1
-        @
-            a = b
-            c = 
-        ''', ValueError, overwrite=True)
+    # def test_create_missing(self):
+    #     self.full_test('''
+    #         a
+    #     @
+    #         a = b/c
+    #     @
+    #         b/c = a
+    #     ''', create_missing=True)
