@@ -16,9 +16,11 @@ def parse(desc):
 def create(root, desc):
     for name, content in parse(desc):
         path = os.path.join(root, name)
-        dir = os.path.dirname(path)
-        if not os.path.exists(dir):
-            os.makedirs(dir)
+        parent = os.path.dirname(path)
+        if path.endswith('/'):
+            parent = os.path.dirname(parent)
+        if not os.path.exists(parent):
+            os.makedirs(parent)
         if path.endswith('/'):
             os.mkdir(path)
         else:
@@ -64,14 +66,36 @@ class RenameTest(unittest.TestCase):
             a
             b
             c
+            d
+
+            e/
+            f/
+
+            g/g1
+            g/g2
+
+            h/h1
+            h/h2
         ''')
         rerename.rename(self.root, parse('''
             a = 1
             b = 2
             c = 3
+            e = 4
+            g/ = 5
         '''), False)
         self.check('''
             1 = a
             2 = b
             3 = c
+            d
+
+            4/
+            f/
+
+            5/g1
+            5/g2
+
+            h/h1
+            h/h2
         ''')
