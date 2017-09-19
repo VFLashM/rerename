@@ -48,9 +48,6 @@ class RenameTest(unittest.TestCase):
         return create(self.root, desc)
 
     def check(self, desc):
-        return check(self.root, desc)
-
-    def check(self, desc):
         parsed_desc = dict(parse(desc))
         for key in parsed_desc:
             if not key.endswith('/'):
