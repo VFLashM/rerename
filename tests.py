@@ -40,7 +40,15 @@ def walk(root_path):
             if not os.listdir(path):
                 rel_path = os.path.relpath(path, root_path)
                 yield rel_path.replace('\\', '/') + '/', None
-    
+
+def iterslash(desc):
+    if '?' not in desc:
+        yield desc
+        return
+    for res in iterslash(desc.replace('?', '/', 1)):
+        yield res
+    for res in iterslash(desc.replace('?', '', 1)):
+        yield res
 
 class RenameTest(unittest.TestCase):
 
@@ -79,19 +87,13 @@ class RenameTest(unittest.TestCase):
             rerename.rename(self.root, mapping, **kwargs)
 
     def full_test_slash(self, desc, **kwargs):
-        if '?' not in desc:
-            return self.full_test(desc, **kwargs)
-        
+        assert '?' in desc
         base_root = self.root
-        
-        self.root = os.path.join(base_root, 's')
-        os.mkdir(self.root)
-        self.full_test_slash(desc.replace('?', '/', 1), **kwargs)
-        
-        self.root = os.path.join(base_root, 'n')
-        os.mkdir(self.root)
-        self.full_test_slash(desc.replace('?', '', 1), **kwargs)
-    
+        for idx, subdesc in enumerate(iterslash(desc)):
+            self.root = os.path.join(base_root, str(idx))
+            os.mkdir(self.root)
+            self.full_test(subdesc, **kwargs)
+
     def setUp(self):
         self.root_obj = tempfile.TemporaryDirectory()
         self.root = self.root_obj.name
@@ -265,19 +267,19 @@ class RenameTest(unittest.TestCase):
             rerename.rename(self.root, parse('a = b/'))
         with self.assertRaises(NotADirectoryError):
             rerename.rename(self.root, parse('a/ = b/'))
+        self.check('a')
 
-    def test_fail_mixup_file_to_dir(self):
-        self.full_test_fail('''
+    def test_fail_mixup(self):
+        src = '''
             a
             b/
-        @
-            a = b
-        ''', IsADirectoryError, overwrite=True)
-
-    def test_fail_mixup_dir_to_file(self):
-        self.full_test_fail('''
-            a/
-            b
-        @
-            a = b
-        ''', NotADirectoryError, overwrite=True)
+        '''
+        self.create(src)
+        with self.assertRaises(IsADirectoryError):
+            rerename.rename(self.root, parse('a = b'), overwrite=True)
+        self.check(src)
+        for subdesc in iterslash('b? = a?'):
+            with self.assertRaises(NotADirectoryError):
+                rerename.rename(self.root, parse(subdesc), overwrite=True)
+            self.check(src)
+            
