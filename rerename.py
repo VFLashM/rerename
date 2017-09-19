@@ -393,21 +393,28 @@ class Renamer(object):
         self._created.append(path)
 
     @staticmethod
-    def _strip_trailing_slash(path):
-        if path.endswith('/'):
-            return path[:-1]
-        if path.endswith('\\'):
-            return path[:-1]
-        return path
+    def _ends_with_slash(path):
+        return path.endswith('/') or path.endswith('\\')
 
     def _rename_mapping(self, mapping, overwrite, create_missing, delete_empty):
         for name_from, name_to in mapping:
-            name_from = self._strip_trailing_slash(name_from)
-            name_to = self._strip_trailing_slash(name_to)
-            if name_from == name_to:
-                continue
             path_from = os.path.join(self._root, name_from)
             path_to = os.path.join(self._root, name_to)
+            dir_mapping = False
+            
+            if self._ends_with_slash(path_from):
+                path_from = path_from[:-1]
+                dir_mapping = True
+
+            if self._ends_with_slash(path_to):
+                path_to = path_to[:-1]
+                dir_mapping = True
+
+            if dir_mapping and not os.path.isdir(path_from):
+                raise ValueError(path_from)
+
+            if path_from == path_to:
+                continue
             
             if not name_to:
                 raise ValueError(name_to)
