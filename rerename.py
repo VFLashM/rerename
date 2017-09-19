@@ -148,56 +148,42 @@ class OptionsFrame(Frame):
     def __init__(self, master):
         Frame.__init__(self, master)
 
-        self._files_var = BooleanVar()
-        self._files_var.set(True)
-        files_cb = Checkbutton(self, text="Files", variable=self._files_var)
-        files_cb.pack(side=LEFT)
-        self._files_var.trace('w', self._options_update)
+        self._vars = {}
 
-        self._dirs_var = BooleanVar()
-        dirs_cb = Checkbutton(self, text="Dirs", variable=self._dirs_var)
-        dirs_cb.pack(side=LEFT)
-        self._dirs_var.trace('w', self._options_update)
-
-        self._others_var = BooleanVar()
-        others_cb = Checkbutton(self, text="Others", variable=self._others_var)
-        others_cb.pack(side=LEFT)
-        self._others_var.trace('w', self._options_update)
+        self._add_option('files', 'Files', True)
+        self._add_option('dirs', 'Dirs')
+        self._add_option('others', 'Others')
 
         Separator(self).pack(side=LEFT, fill=Y)
         
-        self._hide_wrong_type_var = BooleanVar(self)
-        hide_wrong_type_cb = Checkbutton(self, text="Hide wrong entries", variable=self._hide_wrong_type_var)
-        hide_wrong_type_cb.pack(side=LEFT)
-        self._hide_wrong_type_var.trace('w', self._options_update)
-
-        self._hide_mismatches_var = BooleanVar(self)
-        hide_mismatches_cb = Checkbutton(self, text="Hide mismatches", variable=self._hide_mismatches_var)
-        hide_mismatches_cb.pack(side=LEFT)
-        self._hide_mismatches_var.trace('w', self._options_update)
-
+        self._add_option('hide_wrong_type', 'Hide wrong entries')
+        self._add_option('hide_mismatches', 'Hide mismatches')
+        
         Separator(self).pack(side=LEFT, fill=Y)
 
-        self._overwrite_var = BooleanVar()
-        overwrite_cb = Checkbutton(self, text="Overwrite", variable=self._overwrite_var)
-        overwrite_cb.pack(side=LEFT)
-        self._overwrite_var.trace('w', self._options_update)
+        self._add_option('overwrite', 'Overwrite')
 
         repad(self, 'padx', 0, 5)
+
+    def _add_option(self, name, description, value=False):
+        var = BooleanVar()
+        self._vars[name] = var
+        
+        var.set(value)
+        var.trace('w', self._options_update)
+
+        cb = Checkbutton(self, text=description, variable=var)
+        cb.pack(side=LEFT)
 
     def _options_update(self, *_):
         self.event_generate('<<OptionsUpdate>>', when='tail')
 
     @property
     def options(self):
-        return Options(
-            files=self._files_var.get(),
-            dirs=self._dirs_var.get(),
-            others=self._others_var.get(),
-            hide_wrong_type=self._hide_wrong_type_var.get(),
-            hide_mismatches=self._hide_mismatches_var.get(),
-            overwrite=self._overwrite_var.get(),
+        values = dict(
+            (name, var.get()) for (name, var) in self._vars.items()
         )
+        return Options(**values)
         
 
 class ListFrame(Frame):
