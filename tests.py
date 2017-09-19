@@ -107,6 +107,16 @@ class RenameTest(unittest.TestCase):
             b = a
         ''', overwrite=True)
 
+    def test_files_missing(self):
+        self.full_test_fail('''
+            a
+            b
+        @        
+            a = b
+            d = e
+        ''', OSError, overwrite=True)
+
+
     def test_fail_empty(self):
         self.full_test_fail('''
             a
@@ -177,31 +187,34 @@ class RenameTest(unittest.TestCase):
         self._test_dirs('/', '/')
                 
 
-    # def test_overwrite(self):
-    #     self.create('''
-    #         a
-    #         b
+    def test_dirs_overwrite(self):
+        self.full_test('''
+            c/
+            d/
 
-    #         c/
-    #         d/
+            e/e1
+            e/e2
 
-    #         e/e1
-    #         e/e2
+            f/f1
+            f/f2
+        @
+            c = d
+            e = f
+        @
+            d/
 
-    #         f/f1
-    #         f/f2
-    #     @
-    #         a = b
-    #         c = d
-    #         e = f
-    #     @
-    #         b = a
+            f/e1
+            f/e2
 
-    #         d/
+            f/f1
+            f/f2
+        ''', overwrite=True)
 
-    #         f/e1
-    #         f/e2
-
-    #         f/h1
-    #         f/h2
-    #     ''')
+    def test_dirs_overwrite_fail(self):
+        self.full_test_fail('''
+            a/a1
+            b/b1
+        @
+            a = b
+            c = 
+        ''', ValueError, overwrite=True)

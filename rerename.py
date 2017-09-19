@@ -8,6 +8,7 @@ import traceback
 import time
 import hashlib
 import sys
+import shutil
 
 from tkinter import Tk, Label, Button, Entry, Frame, Listbox, StringVar, Grid, Scrollbar, BooleanVar, Checkbutton
 from tkinter import LEFT, RIGHT, BOTH, X, Y, END, VERTICAL, RIDGE
@@ -368,41 +369,85 @@ def md5(val):
     m.update(val.encode('utf8'))
     return m.hexdigest()
 
-def rename(root, mapping, overwrite=False):
-    destinations = set()
-    renamed = []
-    temp = []
-    for name_from, name_to in mapping:
-        if name_from == name_to:
-            continue
-        path_from = os.path.join(root, name_from)
-        path_to = os.path.join(root, name_to)
-        try:
-            if name_to in destinations:
-                raise ValueError(name_to)
-            destinations.add(name_to)
+class Renamer(object):
+
+    def __init__(self, root):
+        self._root = root
+        self._renamed = None
+        self._temp = None
+
+    def _rename(self, path_from, path_to):
+        os.rename(path_from, path_to)
+        self._renamed.append((path_from, path_to))
+
+    def _delete(self, path):
+        tmp = '%s.%s.%s' % (path, os.getpid(), str(time.time()).replace('.', '_'))
+        self._rename(path, tmp)
+        self._temp.append(tmp)
+
+    def _create_parent(self, path):
+        parent = os.path.dirname(path)
+        if not os.path.exists(parent):
+            self._create_parent(parent)
+            os.mkdir(path)
+        self._created.append(path)
+
+    def _rename_mapping(self, mapping, overwrite):
+        for name_from, name_to in mapping:
+            if name_from == name_to:
+                continue
+            path_from = os.path.join(self._root, name_from)
+            path_to = os.path.join(self._root, name_to)
+            
             if not name_to:
                 raise ValueError(name_to)
+            if name_to in self._destinations:
+                raise ValueError(name_to)
+            self._destinations.add(name_to)
+
             try:
-                if os.path.exists(path_to):
+                if os.path.exists(path_to):                
                     raise FileExistsError(path_to)
-                os.rename(path_from, path_to)
+                self._rename(path_from, path_to)
             except FileExistsError:
-                if not overwrite:
+                if os.path.isdir(path_from):
+                    sub_mapping = ((os.path.join(name_from, name), os.path.join(name_to, name)) for name in os.listdir(path_from))
+                    self._rename_mapping(sub_mapping, overwrite)
+                    self._delete(path_from)
+                elif not overwrite:
                     raise
-                path_tmp = '%s.%s.%s.%s' % (path_to, os.getpid(), int(time.time()), md5(path_from))
-                os.rename(path_to, path_tmp)
-                renamed.append((path_to, path_tmp))
-                temp.append(path_tmp)
-                os.rename(path_from, path_to)
-        except Exception as e:
-            for done_from, done_to in reversed(renamed):
+                else:
+                    self._delete(path_to)
+                    self._rename(path_from, path_to)
+
+    def rename_mapping(self, mapping, overwrite):
+        self._renamed = []
+        self._created = []
+        self._temp = []
+        self._destinations = set()
+        
+        try:
+            self._rename_mapping(mapping, overwrite)
+        except:
+            for done_from, done_to in reversed(self._renamed):
                 os.rename(done_to, done_from)
+            for path in reversed(self._created):
+                os.rmdir(path)
             raise
-        else:
-            renamed.append((path_from, path_to))
-    for path in temp:
-        os.remove(path)
+        
+        for path in reversed(self._temp):
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
+            
+        self._renamed = None
+        self._created = None
+        self._temp = None
+        self._destinations = None
+
+def rename(root, mapping, overwrite=False):
+    Renamer(root).rename_mapping(mapping, overwrite)
 
 def show_error(self, et, ev, tb):
     for line in traceback.format_exception(et, ev, tb):
