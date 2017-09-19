@@ -58,6 +58,12 @@ class RenameTest(unittest.TestCase):
                     parsed_desc[key] = os.path.basename(key)
         self.assertEqual(parsed_desc, dict(walk(self.root)))
 
+    def full_test(self, desc, **kwargs):
+        before, rename, after = desc.split('@')
+        self.create(before)
+        rerename.rename(self.root, parse(rename), **kwargs)
+        self.check(after)
+
     def setUp(self):
         self.root_obj = tempfile.TemporaryDirectory()
         self.root = self.root_obj.name
@@ -68,26 +74,24 @@ class RenameTest(unittest.TestCase):
         self.root = None
     
     def test_files(self):
-        self.create('''
+        self.full_test('''
             a
             b
             c
             d
-        ''')
-        rerename.rename(self.root, parse('''
+        @            
             a = 1
             b = 2
             c = 3
-        '''), False)
-        self.check('''
+        @
             1 = a
             2 = b
             3 = c
             d
         ''')
 
-    def test_dirs(self):
-        src = '''
+    def _test_dirs(self, before, after):
+        self.full_test('''
             e/
             f/
 
@@ -96,15 +100,10 @@ class RenameTest(unittest.TestCase):
 
             h/h1
             h/h2
-        '''
-        self.create(src)
-
-        # without tail slash
-        rerename.rename(self.root, parse('''
-            e = 4
-            g = 5
-        '''), False)
-        self.check('''
+        @
+            e{before} = 4{after}
+            g{before} = 5{after}
+        @
             4/
             f/
 
@@ -113,14 +112,18 @@ class RenameTest(unittest.TestCase):
 
             h/h1
             h/h2
-        ''')
+        '''.format(before=before, after=after))
 
-        # with tail slash
-        rerename.rename(self.root, parse('''
-            4/ = e
-            5/ = g
-        '''), False)
-        self.check(src)
+    # ensure dirs rename works regardless of trailing slash
+    def test_dirs_nn(self):
+        self._test_dirs('', '')
+    def test_dirs_sn(self):
+        self._test_dirs('/', '')
+    def test_dirs_ns(self):
+        self._test_dirs('', '/')
+    def test_dirs_ss(self):
+        self._test_dirs('/', '/')
+                
 
     # def test_overwrite(self):
     #     self.create('''
@@ -135,15 +138,14 @@ class RenameTest(unittest.TestCase):
 
     #         f/f1
     #         f/f2
-    #     ''')
-    #     rerename.rename(self.root, parse('''
+    #     @
     #         a = b
     #         c = d
     #         e = f
-    #     '''), True)
-    #     self.check('''
+    #     @
     #         b = a
-    #         d = c
+
+    #         d/
 
     #         f/e1
     #         f/e2
