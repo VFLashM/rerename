@@ -81,6 +81,19 @@ class RenameTest(unittest.TestCase):
         with self.assertRaises(OSError):
             rerename.rename(self.root, mapping, **kwargs)
 
+    def full_test_slash(self, desc, **kwargs):
+        if '?' not in desc:
+            return self.full_test(desc, **kwargs)
+        
+        base_root = self.root
+        
+        self.root = os.path.join(base_root, 's')
+        os.mkdir(self.root)
+        self.full_test_slash(desc.replace('?', '/', 1), **kwargs)
+        
+        self.root = os.path.join(base_root, 'n')
+        os.mkdir(self.root)
+        self.full_test_slash(desc.replace('?', '', 1), **kwargs)
     
     def setUp(self):
         self.root_obj = tempfile.TemporaryDirectory()
@@ -163,8 +176,8 @@ class RenameTest(unittest.TestCase):
         ''', OSError)
         
 
-    def _test_dirs(self, before, after):
-        self.full_test('''
+    def test_dirs(self):
+        self.full_test_slash('''
             e/
             f/
 
@@ -174,8 +187,8 @@ class RenameTest(unittest.TestCase):
             h/h1
             h/h2
         @
-            e{before} = 4{after}
-            g{before} = 5{after}
+            e? = 4?
+            g? = 5?
         @
             4/
             f/
@@ -185,21 +198,10 @@ class RenameTest(unittest.TestCase):
 
             h/h1
             h/h2
-        '''.format(before=before, after=after))
-
-    # ensure dirs rename works regardless of trailing slash
-    def test_dirs_nn(self):
-        self._test_dirs('', '')
-    def test_dirs_sn(self):
-        self._test_dirs('/', '')
-    def test_dirs_ns(self):
-        self._test_dirs('', '/')
-    def test_dirs_ss(self):
-        self._test_dirs('/', '/')
-                
+        ''')
 
     def test_dirs_overwrite(self):
-        self.full_test('''
+        self.full_test_slash('''
             c/
             d/
 
@@ -209,8 +211,8 @@ class RenameTest(unittest.TestCase):
             f/f1
             f/f2
         @
-            c = d
-            e = f
+            c? = d?
+            e? = f?
         @
             d/
 
@@ -222,19 +224,19 @@ class RenameTest(unittest.TestCase):
         ''', overwrite=True)
 
     def test_create_missing(self):
-        self.full_test('''
+        self.full_test_slash('''
             a
             c/
         @
             a = b/a
-            c = d/c
+            c? = d/c?
         @
             b/a
             d/c/
         ''', create_missing=True)
 
     def test_delete_empty(self):
-        self.full_test('''
+        self.full_test_slash('''
             a/a1
             a/a2
       
@@ -248,7 +250,7 @@ class RenameTest(unittest.TestCase):
             a/a1 = a1
             a/a2 = a2
             b/b1 = b1
-            c/c1 = c1
+            c/c1? = c1?
         @
             a1
             a2
@@ -257,3 +259,12 @@ class RenameTest(unittest.TestCase):
             c1/
             d/
         ''', delete_empty=True)
+
+    def test_fail_wrong_trailing_slash(self):
+        self.create('a')
+        with self.assertRaises(ValueError):
+            rerename.rename(self.root, parse('a/ = b'))
+        with self.assertRaises(ValueError):
+            rerename.rename(self.root, parse('a = b/'))
+        with self.assertRaises(ValueError):
+            rerename.rename(self.root, parse('a/ = b/'))

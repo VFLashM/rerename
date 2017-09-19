@@ -385,22 +385,25 @@ class Renamer(object):
         self._rename(path, tmp)
         self._temp.append(tmp)
 
-    @staticmethod
-    def _parent(path):
-        parent = os.path.dirname(path)
-        if path.endswith('/'):
-            parent = os.path.dirname(parent)
-        return parent
-
     def _ensure_parent_exists(self, path):
-        parent = self._parent(path)
+        parent = os.path.dirname(path)
         if not os.path.exists(parent):
             self._ensure_parent_exists(parent)
             os.mkdir(parent)
         self._created.append(path)
 
+    @staticmethod
+    def _strip_trailing_slash(path):
+        if path.endswith('/'):
+            return path[:-1]
+        if path.endswith('\\'):
+            return path[:-1]
+        return path
+
     def _rename_mapping(self, mapping, overwrite, create_missing, delete_empty):
         for name_from, name_to in mapping:
+            name_from = self._strip_trailing_slash(name_from)
+            name_to = self._strip_trailing_slash(name_to)
             if name_from == name_to:
                 continue
             path_from = os.path.join(self._root, name_from)
@@ -415,7 +418,7 @@ class Renamer(object):
             try:
                 if os.path.exists(path_to):                
                     raise FileExistsError(path_to)
-                parent_to = self._parent(path_to)
+                parent_to = os.path.dirname(path_to)
                 if create_missing:
                     self._ensure_parent_exists(path_to)
                 self._rename(path_from, path_to)
@@ -453,7 +456,7 @@ class Renamer(object):
 
         parents = []
         for path_from, path_to in reversed(self._renamed):
-            parents.append(self._parent(path_from))
+            parents.append(os.path.dirname(path_from))
         processed_parents = set()
         for parent in parents:
             if parent not in processed_parents:
