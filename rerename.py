@@ -368,7 +368,8 @@ def md5(val):
     m.update(val.encode('utf8'))
     return m.hexdigest()
 
-def rename(root, mapping, overwrite):
+def rename(root, mapping, overwrite=False):
+    destinations = set()
     renamed = []
     temp = []
     for name_from, name_to in mapping:
@@ -377,6 +378,11 @@ def rename(root, mapping, overwrite):
         path_from = os.path.join(root, name_from)
         path_to = os.path.join(root, name_to)
         try:
+            if name_to in destinations:
+                raise ValueError(name_to)
+            destinations.add(name_to)
+            if not name_to:
+                raise ValueError(name_to)
             try:
                 if os.path.exists(path_to):
                     raise FileExistsError(path_to)
