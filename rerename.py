@@ -518,7 +518,7 @@ def main():
         elif not list_frame.mapping:
             showerror('Error', 'Nothing to rename')
         else:
-            rename(root_frame.value, list_frame.mapping, options_frame.options.overwrite)
+            rename(root_frame.root, list_frame.mapping, options_frame.options.overwrite)
             master.event_generate('<<Refresh>>', when='tail')
 
     rename_button = Button(master, text='Rename', command=perform_rename)
