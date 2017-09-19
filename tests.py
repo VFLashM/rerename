@@ -221,11 +221,39 @@ class RenameTest(unittest.TestCase):
             f/f2
         ''', overwrite=True)
 
-    # def test_create_missing(self):
-    #     self.full_test('''
-    #         a
-    #     @
-    #         a = b/c
-    #     @
-    #         b/c = a
-    #     ''', create_missing=True)
+    def test_create_missing(self):
+        self.full_test('''
+            a
+            c/
+        @
+            a = b/a
+            c = d/c
+        @
+            b/a
+            d/c/
+        ''', create_missing=True)
+
+    def test_delete_empty(self):
+        self.full_test('''
+            a/a1
+            a/a2
+      
+            b/b1
+            b/b2
+ 
+            c/c1/
+
+            d/
+        @
+            a/a1 = a1
+            a/a2 = a2
+            b/b1 = b1
+            c/c1 = c1
+        @
+            a1
+            a2
+            b1
+            b/b2
+            c1/
+            d/
+        ''', delete_empty=True)

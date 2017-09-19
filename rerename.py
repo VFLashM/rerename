@@ -385,14 +385,21 @@ class Renamer(object):
         self._rename(path, tmp)
         self._temp.append(tmp)
 
-    def _create_parent(self, path):
+    @staticmethod
+    def _parent(path):
         parent = os.path.dirname(path)
+        if path.endswith('/'):
+            parent = os.path.dirname(parent)
+        return parent
+
+    def _ensure_parent_exists(self, path):
+        parent = self._parent(path)
         if not os.path.exists(parent):
-            self._create_parent(parent)
-            os.mkdir(path)
+            self._ensure_parent_exists(parent)
+            os.mkdir(parent)
         self._created.append(path)
 
-    def _rename_mapping(self, mapping, overwrite):
+    def _rename_mapping(self, mapping, overwrite, create_missing, delete_empty):
         for name_from, name_to in mapping:
             if name_from == name_to:
                 continue
@@ -408,11 +415,14 @@ class Renamer(object):
             try:
                 if os.path.exists(path_to):                
                     raise FileExistsError(path_to)
+                parent_to = self._parent(path_to)
+                if create_missing:
+                    self._ensure_parent_exists(path_to)
                 self._rename(path_from, path_to)
             except FileExistsError:
                 if os.path.isdir(path_from):
                     sub_mapping = ((os.path.join(name_from, name), os.path.join(name_to, name)) for name in os.listdir(path_from))
-                    self._rename_mapping(sub_mapping, overwrite)
+                    self._rename_mapping(sub_mapping, overwrite, create_missing, delete_empty)
                     self._delete(path_from)
                 elif not overwrite:
                     raise
@@ -420,14 +430,14 @@ class Renamer(object):
                     self._delete(path_to)
                     self._rename(path_from, path_to)
 
-    def rename_mapping(self, mapping, overwrite):
+    def rename_mapping(self, mapping, overwrite, create_missing, delete_empty):
         self._renamed = []
         self._created = []
         self._temp = []
         self._destinations = set()
         
         try:
-            self._rename_mapping(mapping, overwrite)
+            self._rename_mapping(mapping, overwrite, create_missing, delete_empty)
         except:
             for done_from, done_to in reversed(self._renamed):
                 os.rename(done_to, done_from)
@@ -440,14 +450,24 @@ class Renamer(object):
                 shutil.rmtree(path)
             else:
                 os.remove(path)
+
+        parents = []
+        for path_from, path_to in reversed(self._renamed):
+            parents.append(self._parent(path_from))
+        processed_parents = set()
+        for parent in parents:
+            if parent not in processed_parents:
+                if os.path.isdir(parent) and not os.listdir(parent):
+                    os.rmdir(parent)
+                processed_parents.add(parent)
             
         self._renamed = None
         self._created = None
         self._temp = None
         self._destinations = None
 
-def rename(root, mapping, overwrite=False):
-    Renamer(root).rename_mapping(mapping, overwrite)
+def rename(root, mapping, overwrite=False, create_missing=False, delete_empty=False):
+    Renamer(root).rename_mapping(mapping, overwrite, create_missing, delete_empty)
 
 def show_error(self, et, ev, tb):
     for line in traceback.format_exception(et, ev, tb):
