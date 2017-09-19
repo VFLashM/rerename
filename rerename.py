@@ -46,6 +46,11 @@ class RootFrame(Frame):
         label.pack(side=LEFT)
         self._entry = Entry(self, textvariable=self._var)
         self._entry.pack(side=LEFT, fill=X, expand=True)
+
+        self._recursive_var = BooleanVar()
+        recursive_cb = Checkbutton(self, text='Recursive', variable=self._recursive_var)
+        recursive_cb.pack(side=LEFT)
+        self._recursive_var.trace('w', self._validate)
         
         open_button = Button(self, text="Open", command=self._select_root)
         open_button.pack(side=LEFT)
@@ -75,8 +80,13 @@ class RootFrame(Frame):
             self._validate()
 
     @property
-    def value(self):
+    def root(self):
         return self._value
+
+    
+    @property
+    def recursive(self):
+        return self._recursive_var.get()
 
 
 class RegexFrame(Frame):
@@ -141,7 +151,7 @@ class RegexFrame(Frame):
         return self._repl_value
 
 
-Options = namedtuple('Options', 'files dirs others hide_wrong_type hide_mismatches overwrite')
+Options = namedtuple('Options', 'files dirs others hide_wrong_type hide_mismatches overwrite create_missing delete_empty')
 
 
 class OptionsFrame(Frame):
@@ -162,6 +172,8 @@ class OptionsFrame(Frame):
         Separator(self).pack(side=LEFT, fill=Y)
 
         self._add_option('overwrite', 'Overwrite')
+        self._add_option('create_missing', 'Create missing dirs', True)
+        self._add_option('delete_empty', 'Delete empty dirs')
 
         repad(self, 'padx', 0, 5)
 
@@ -187,7 +199,10 @@ class OptionsFrame(Frame):
         
 
 class ListFrame(Frame):
-    def __init__(self, master, root, regex, repl, options):
+    def __init__(self, master,
+                 root, recursive,
+                 regex, repl,
+                 options):
         Frame.__init__(self, master)
 
         self._left_list = Listbox(self)
@@ -208,10 +223,11 @@ class ListFrame(Frame):
         self._repl = repl
         self._settings = options
         self._root = None
+        self._recursive = None
         self._names = None
         self._mapping = None
         self._errors = None
-        self._update_root(root)
+        self._update_root(root, recursive)
 
         master.bind('<<RootUpdate>>', self._on_root_update)
         master.bind('<<RegexUpdate>>', self._on_regex_update)
@@ -231,13 +247,13 @@ class ListFrame(Frame):
         self._right_list.yview(*args)
 
     def _on_root_update(self, event):
-        self._update_root(event.widget.value)
+        self._update_root(event.widget.root, event.widget.recursive)
 
     def _on_regex_update(self, event):
         self._update_regex(event.widget.regex, event.widget.repl)
 
     def _on_refresh(self, event):
-        self._update_root(self._root)
+        self._update_root(self._root, self._recursive)
 
     def _on_options_update(self, event):
         self._settings = event.widget.options
@@ -256,12 +272,25 @@ class ListFrame(Frame):
         else:
             return self._settings.others
 
-    def _update_root(self, root):
+    def _walk(self):
+        for root, dirs, files in os.walk(self._root):
+            for name in files + dirs:
+                path = os.path.join(root, name)
+                yield os.path.relpath(path, self._root)
+
+    def _entries(self):
+        if self._recursive:
+            return self._walk()
+        else:
+            return os.listdir(self._root)
+
+    def _update_root(self, root, recursive):
         self._root = root
+        self._recursive = recursive
         self._left_list.delete(0, END)
         self._names = []
         if self._root:
-            for name in sorted(os.listdir(root)):
+            for name in sorted(self._entries()):
                 path = os.path.join(self._root, name)
                 ftype = None
                 if os.path.isfile(path):
@@ -391,7 +420,7 @@ def main():
     options_frame.pack(fill=X)
 
     list_frame = ListFrame(master,
-                           root_frame.value,
+                           root_frame.root, root_frame.recursive,
                            regex_frame.regex, regex_frame.repl,
                            options_frame.options)
     list_frame.pack(fill=BOTH, expand=True)
