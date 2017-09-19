@@ -64,6 +64,13 @@ class RenameTest(unittest.TestCase):
         rerename.rename(self.root, parse(rename), **kwargs)
         self.check(after)
 
+    def full_test_fail(self, desc, etype, **kwargs):
+        before, rename = desc.split('@')
+        self.create(before)
+        with self.assertRaises(etype):
+            rerename.rename(self.root, parse(rename), **kwargs)
+        self.check(before)
+
     def setUp(self):
         self.root_obj = tempfile.TemporaryDirectory()
         self.root = self.root_obj.name
@@ -89,6 +96,51 @@ class RenameTest(unittest.TestCase):
             3 = c
             d
         ''')
+
+    def test_files_overwrite(self):
+        self.full_test('''
+            a
+            b
+        @            
+            a = b
+        @
+            b = a
+        ''', overwrite=True)
+
+    def test_fail_empty(self):
+        self.full_test_fail('''
+            a
+            b
+            c
+            d
+        @     
+            b=1
+            c=
+        ''', ValueError)
+
+    def test_fail_dup(self):
+        self.full_test_fail('''
+            a
+            b
+            c
+            d
+        @     
+            a = b
+            c = 1
+            d = 1
+        ''', ValueError, overwrite=True)
+
+    def test_fail_overwrite(self):
+        self.full_test_fail('''
+            a
+            b
+            c
+            d
+        @     
+            b=1
+            c=d
+        ''', OSError)
+        
 
     def _test_dirs(self, before, after):
         self.full_test('''
