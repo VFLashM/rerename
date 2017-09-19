@@ -78,7 +78,7 @@ class RenameTest(unittest.TestCase):
         self.create(before)
         mapping = list(parse(rename))
         mapping.append(('missing', 'irrelevant'))
-        with self.assertRaises(OSError):
+        with self.assertRaises(FileNotFoundError):
             rerename.rename(self.root, mapping, **kwargs)
 
     def full_test_slash(self, desc, **kwargs):
@@ -138,7 +138,7 @@ class RenameTest(unittest.TestCase):
         @        
             a = b
             d = e
-        ''', OSError, overwrite=True)
+        ''', FileNotFoundError, overwrite=True)
 
 
     def test_fail_empty(self):
@@ -173,7 +173,7 @@ class RenameTest(unittest.TestCase):
         @     
             b=1
             c=d
-        ''', OSError)
+        ''', FileExistsError)
         
 
     def test_dirs(self):
@@ -262,9 +262,25 @@ class RenameTest(unittest.TestCase):
 
     def test_fail_wrong_trailing_slash(self):
         self.create('a')
-        with self.assertRaises(ValueError):
+        with self.assertRaises(NotADirectoryError):
             rerename.rename(self.root, parse('a/ = b'))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(NotADirectoryError):
             rerename.rename(self.root, parse('a = b/'))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(NotADirectoryError):
             rerename.rename(self.root, parse('a/ = b/'))
+
+    def test_fail_mixup_file_to_dir(self):
+        self.full_test_fail('''
+            a
+            b/
+        @
+            a = b
+        ''', IsADirectoryError, overwrite=True)
+
+    def test_fail_mixup_dir_to_file(self):
+        self.full_test_fail('''
+            a/
+            b
+        @
+            a = b
+        ''', NotADirectoryError, overwrite=True)

@@ -402,16 +402,16 @@ class Renamer(object):
             path_to = os.path.join(self._root, name_to)
             dir_mapping = False
             
-            if self._ends_with_slash(path_from):
+            if self._ends_with_slash(name_from):
                 path_from = path_from[:-1]
                 dir_mapping = True
 
-            if self._ends_with_slash(path_to):
+            if self._ends_with_slash(name_to):
                 path_to = path_to[:-1]
                 dir_mapping = True
 
             if dir_mapping and not os.path.isdir(path_from):
-                raise ValueError(path_from)
+                raise NotADirectoryError(path_from)
 
             if path_from == path_to:
                 continue
@@ -423,20 +423,23 @@ class Renamer(object):
             self._destinations.add(name_to)
 
             try:
-                if os.path.exists(path_to):                
+                if os.path.exists(path_to):
                     raise FileExistsError(path_to)
-                parent_to = os.path.dirname(path_to)
                 if create_missing:
                     self._ensure_parent_exists(path_to)
                 self._rename(path_from, path_to)
             except FileExistsError:
                 if os.path.isdir(path_from):
+                    if not os.path.isdir(path_to):
+                        raise NotADirectoryError(path_to)
                     sub_mapping = ((os.path.join(name_from, name), os.path.join(name_to, name)) for name in os.listdir(path_from))
                     self._rename_mapping(sub_mapping, overwrite, create_missing, delete_empty)
                     self._delete(path_from)
                 elif not overwrite:
                     raise
                 else:
+                    if os.path.isdir(path_to):
+                        raise IsADirectoryError(path_to)
                     self._delete(path_to)
                     self._rename(path_from, path_to)
 
